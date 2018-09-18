@@ -1,0 +1,11 @@
+{
+  "name": "merge_colors",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "color-difference": "^0.3.4",
+    "globby": "^8.0.1",
+    "minimist": "^1.2.0"
+  }
+}
