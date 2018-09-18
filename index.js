@@ -7,7 +7,16 @@ const parseArgs = require('minimist');
 const glob = require('globby');
 const cd = require('color-difference');
 
-let { variables, directory, threshold = 20 } = parseArgs(process.argv, opts = {});
+let { variables, directory, threshold } = parseArgs(
+    process.argv.slice(2),
+    {
+        string: ['variables', 'directory', 'threshold'],
+        alias: { V: 'variables', d: 'directory', t: 'threshold' },
+        defaults: { threshold: 20 }
+    }
+);
+
+threshold = parseInt(threshold, 10);
 
 const varsFile = path.resolve(variables);
 

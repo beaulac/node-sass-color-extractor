@@ -1,8 +1,10 @@
 {
-  "name": "merge_colors",
+  "name": "sass-color-extractor",
   "version": "1.0.0",
   "main": "index.js",
-  "license": "UNLICENSED",
+  "author": "Antoine Beauvais-Lacasse <antoine.beaulac@gmail.com>",
+  "repository": "https://github.com/beaulac/node-sass-color-extractor.git",
+  "license": "ISC",
   "dependencies": {
     "color-difference": "^0.3.4",
     "globby": "^8.0.1",
