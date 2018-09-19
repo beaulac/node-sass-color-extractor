@@ -8,13 +8,16 @@ const glob = require('globby');
 const cd = require('color-difference');
 const chalk = require('chalk');
 
+RegExp.prototype.reset = function () {
+    this.lastIndex = 0;
+};
 
-let { variables, directory, threshold } = parseArgs(
+let { variables, directory, threshold, exclude } = parseArgs(
     process.argv.slice(2),
     {
-        string: ['variables', 'directory', 'threshold'],
-        alias: { V: 'variables', d: 'directory', t: 'threshold' },
-        default: { threshold: 20 }
+        string: ['variables', 'directory', 'threshold', 'exclude'],
+        alias: { V: 'variables', d: 'directory', t: 'threshold', x: 'exclude' },
+        default: { threshold: 20, exclude: '' }
     }
 );
 
@@ -49,19 +52,20 @@ function promiseReadLine(file, onLine, onClose = () => undefined) {
 }
 
 function extractStyleVarFromLine(line) {
-    const [, key, value] = ((new RegExp(sassVarMatcher)).exec(line) || []);
+    const [, key, value] = (sassVarMatcher.exec(line) || []);
+    sassVarMatcher.reset();
     return { key, value };
 }
 
 function hexCodesOnLine(line) {
-    const matcher = new RegExp(hexMatcher);
     const hexCodes = [];
     let matchedCode;
 
-    while (matchedCode = matcher.exec(line)) {
+    while (matchedCode = hexMatcher.exec(line)) {
         hexCodes.push(matchedCode[1]);
     }
 
+    hexMatcher.reset();
     return hexCodes;
 }
 
@@ -111,8 +115,9 @@ function extractStyleVariables() {
 
 
 function findStyleFiles() {
+    const excludedFiles = exclude.split(',').map(x => `!${path.join(stylesDirectory, x)}`);
     return glob(
-        [stylesDirectory, `!${varsFile}`],
+        [stylesDirectory, `!${varsFile}`, ...excludedFiles],
         {
             absolute: true,
             onlyFiles: true,
