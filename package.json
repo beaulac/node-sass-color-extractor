@@ -6,6 +6,7 @@
   "repository": "https://github.com/beaulac/node-sass-color-extractor.git",
   "license": "ISC",
   "dependencies": {
+    "chalk": "^2.4.1",
     "color-difference": "^0.3.4",
     "globby": "^8.0.1",
     "minimist": "^1.2.0"

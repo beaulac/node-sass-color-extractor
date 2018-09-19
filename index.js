@@ -6,13 +6,15 @@ const writeFileAsync = util.promisify(fs.writeFile);
 const parseArgs = require('minimist');
 const glob = require('globby');
 const cd = require('color-difference');
+const chalk = require('chalk');
+
 
 let { variables, directory, threshold } = parseArgs(
     process.argv.slice(2),
     {
         string: ['variables', 'directory', 'threshold'],
         alias: { V: 'variables', d: 'directory', t: 'threshold' },
-        defaults: { threshold: 20 }
+        default: { threshold: 20 }
     }
 );
 
@@ -26,9 +28,9 @@ if (!directory) {
 const stylesDirectory = path.resolve(directory);
 
 
-const sassVarMatcher = /\$(.+?):\s*?(.+?);/;
+const sassVarMatcher = /\$(.+?):\s*?(.+?);/g;
 
-const hexMatcher = /(#[A-Fa-f0-9]{6}|#[A-Fa-f0-9]{3})/;
+const hexMatcher = /(#[A-Fa-f0-9]{6}|#[A-Fa-f0-9]{3})/gi;
 
 
 function promiseReadLine(file, onLine, onClose = () => undefined) {
@@ -51,8 +53,16 @@ function extractStyleVarFromLine(line) {
     return { key, value };
 }
 
-function hexCodeOfLine(line) {
-    return (hexMatcher.exec(line) || [])[1];
+function hexCodesOnLine(line) {
+    const matcher = new RegExp(hexMatcher);
+    const hexCodes = [];
+    let matchedCode;
+
+    while (matchedCode = matcher.exec(line)) {
+        hexCodes.push(matchedCode[1]);
+    }
+
+    return hexCodes;
 }
 
 
@@ -82,7 +92,14 @@ function extractStyleVariables() {
         }
     };
 
-    const onClose = () => ({ aliases, roots });
+    const onClose = () => Object.keys(roots)
+                                .reduce((variablesByColor, variableName) => {
+                                        const color = roots[variableName];
+                                        variablesByColor[color] = variableName;
+                                        return variablesByColor;
+                                    },
+                                    {}
+                                );
 
     return promiseReadLine(varsFile, onLine, onClose);
 }
@@ -99,16 +116,30 @@ function findStyleFiles() {
     );
 }
 
+function isBrightish(hex) {
+    return cd.compare(hex, '#000') >= 50;
+}
+
+function printHex(hexCode) {
+    return chalk.keyword(isBrightish(hexCode) ? 'black' : 'white').bgHex(hexCode)(hexCode.padEnd(7));
+}
+
+function printDistance(distance) {
+    const bad = distance > threshold;
+    return chalk.keyword('white').bgKeyword(bad ? 'red' : 'green')(((bad ? '!' : '✔') + ' (' + distance.toFixed(2) + ')').padEnd(10));
+}
+
 
 async function run() {
-    const { roots: colorVariables } = await extractStyleVariables();
+    const variablesByColor = await extractStyleVariables()
+        , colors = Object.keys(variablesByColor);
 
-    const colors = [], variablesByColor = {};
-    for (const variableName of Object.keys(colorVariables)) {
-        let colorCode = colorVariables[variableName];
-        colors.push(colorCode);
-        variablesByColor[colorCode] = variableName;
+    const allStyleFiles = await findStyleFiles();
+
+    for (const styleFile of allStyleFiles) {
+        await processStyleFile(styleFile);
     }
+
 
     function findClosestColor(hexCode) {
         let closestDistance = Number.MAX_SAFE_INTEGER;
@@ -123,40 +154,56 @@ async function run() {
                 }
                 return closest;
             },
-            closestDistance
+            ''
         );
 
         return { color: closestColor, distance: closestDistance };
     }
 
-
-    const allStyleFiles = await findStyleFiles();
-
-    for (const styleFile of allStyleFiles) {
+    function processStyleFile(file) {
         let output = '';
 
         const onLine = line => {
-            const hexCode = hexCodeOfLine(line);
-            if (hexCode) {
-                const { color, distance } = findClosestColor(hexCode);
+            const hexCodes = hexCodesOnLine(line);
 
-                const variableName = variablesByColor[color];
+            hexCodes.forEach(
+                (hexCode) => {
+                    const { color, distance } = findClosestColor(hexCode);
 
-                if (distance <= threshold) {
-                    line = line.replace(hexCode, `$${variableName}`);
-                } else {
-                    console.warn(hexCode, 'closest to', variableName, color, `(${distance})`);
+                    const variableName = variablesByColor[color];
+
+                    if (distance <= threshold) {
+
+                        console.log(
+                            printDistance(distance),
+                            printHex(hexCode),
+                            ' ⇒ ',
+                            printHex(color),
+                            variableName,
+                            file
+                        );
+
+                        line = line.replace(hexCode, ` $${variableName}`);
+                    } else {
+                        console.warn(
+                            printDistance(distance),
+                            printHex(hexCode),
+                            ' ⇏ ',
+                            printHex(color),
+                            variableName,
+                            file
+                        );
+                    }
                 }
-            }
+            );
 
             output += `${line}\n`;
         };
 
-        const onClose = () => writeFileAsync(styleFile, output, 'utf8');
+        const onClose = () => writeFileAsync(file, output, 'utf8');
 
-        await promiseReadLine(styleFile, onLine, onClose);
+        return promiseReadLine(file, onLine, onClose);
     }
-
 }
 
 run();
