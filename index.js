@@ -49,7 +49,7 @@ function promiseReadLine(file, onLine, onClose = () => undefined) {
 }
 
 function extractStyleVarFromLine(line) {
-    const [, key, value] = (sassVarMatcher.exec(line) || []);
+    const [, key, value] = ((new RegExp(sassVarMatcher)).exec(line) || []);
     return { key, value };
 }
 
@@ -69,11 +69,16 @@ function hexCodesOnLine(line) {
 function extractStyleVariables() {
     const aliases = {}, roots = {};
 
+    let lineNum = 0;
+
     const onLine = line => {
         const { key, value } = extractStyleVarFromLine(line);
+
+        // console.log(++lineNum, line, key, value);
+
         if (key && value) {
             let varValue = value.trim();
-            if (hexMatcher.test(varValue)) {
+            if (varValue.match(hexMatcher)) {
                 return roots[key.trim()] = varValue;
 
             } else if (varValue.startsWith('$')) {
@@ -125,8 +130,11 @@ function printHex(hexCode) {
 }
 
 function printDistance(distance) {
-    const bad = distance > threshold;
-    return chalk.keyword('white').bgKeyword(bad ? 'red' : 'green')(((bad ? '!' : '✔') + ' (' + distance.toFixed(2) + ')').padEnd(10));
+    const bad = distance > threshold
+        , bg = bad ? 'red' : 'green'
+        , sym = bad ? '!' : '✔';
+    return chalk.keyword('white')
+                .bgKeyword(bg)(((sym) + ' (' + distance.toFixed(2) + ')').padEnd(10));
 }
 
 
